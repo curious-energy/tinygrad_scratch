@@ -3,27 +3,12 @@
 
 import numpy as np
 from tinygrad.tensor import Tensor
+import tinygrad.optim as optim
+from tinygrad.utils import fetch_mnist
+
 from tqdm import trange
 
-
-# load the mnist dataset
-
-def fetch(url):
-  import requests, gzip, os, hashlib, numpy
-  fp = os.path.join("/tmp", hashlib.md5(url.encode('utf-8')).hexdigest())
-  if os.path.isfile(fp):
-    with open(fp, "rb") as f:
-      dat = f.read()
-  else:
-    with open(fp, "wb") as f:
-      dat = requests.get(url).content
-      f.write(dat)
-  return numpy.frombuffer(gzip.decompress(dat), dtype=np.uint8).copy()
-X_train = fetch("http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz")[0x10:].reshape((-1, 28, 28))
-Y_train = fetch("http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz")[8:]
-X_test = fetch("http://yann.lecun.com/exdb/mnist/t10k-images-idx3-ubyte.gz")[0x10:].reshape((-1, 28, 28))
-Y_test = fetch("http://yann.lecun.com/exdb/mnist/t10k-labels-idx1-ubyte.gz")[8:]
-
+X_train, Y_train, X_test, Y_test = fetch_mnist()
 
 # train a model
 def layer_init(m, h):
@@ -41,7 +26,7 @@ class TinyNet:
 
 
 model = TinyNet()
-
+optim = optim.SGD([model.l1, model.l2], lr=0.01)
 batch_size = 128
 lr=0.01
 
@@ -60,13 +45,10 @@ for i in loop:
 
     loss = outs.mul(y).mean()
     loss.backward()
+    optim.step() # SGD
 
     cat = np.argmax(outs.data, axis=1)
     accuracy = (cat == Y).mean()
-
-    # SGD
-    model.l1.data = model.l1.data - lr * model.l1.grad
-    model.l2.data = model.l2.data - lr * model.l2.grad
 
     loss = loss.data
     losses.append(loss)
