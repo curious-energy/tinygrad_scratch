@@ -4,29 +4,26 @@
 import numpy as np
 from tinygrad.tensor import Tensor
 import tinygrad.optim as optim
-from tinygrad.utils import fetch_mnist
+from tinygrad.utils import layer_init_uniform,fetch_mnist
 
 from tqdm import trange
+np.random.seed(1337)
 
 X_train, Y_train, X_test, Y_test = fetch_mnist()
 
 # train a model
-def layer_init(m, h):
-    ret = np.random.uniform(-1., 1., size=(m,h))/np.sqrt(m*h)
-    return ret.astype(np.float32)
-
 # model
 class TinyNet:
     def __init__(self):
-       self.l1 = Tensor(layer_init(784, 128))
-       self.l2 = Tensor(layer_init(128, 10))
+       self.l1 = Tensor(layer_init_uniform(784, 128))
+       self.l2 = Tensor(layer_init_uniform(128, 10))
 
     def forward(self, x):
         return x.dot(self.l1).relu().dot(self.l2).logsoftmax()
 
-
+    
 model = TinyNet()
-optim = optim.SGD([model.l1, model.l2], lr=0.01)
+optim = optim.SGD([model.l1, model.l2], lr=0.001)
 # optim = optim.Adam([model.l1, model.l2], lr=0.001)
 batch_size = 128
 lr=0.01
@@ -39,7 +36,7 @@ for i in loop:
     x = Tensor(X_train[samp].reshape((-1, 28*28)))
     Y = Y_train[samp]
     y = np.zeros((len(samp), 10), np.float32)
-    y[range(y.shape[0]), Y] = -1.0
+    y[range(y.shape[0]), Y] = -10.0
     y = Tensor(y)
 
     outs = model.forward(x)
