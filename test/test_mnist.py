@@ -27,6 +27,7 @@ class TinyNet:
 
 model = TinyNet()
 optim = optim.SGD([model.l1, model.l2], lr=0.01)
+# optim = optim.Adam([model.l1, model.l2], lr=0.001)
 batch_size = 128
 lr=0.01
 
