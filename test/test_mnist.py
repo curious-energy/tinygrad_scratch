@@ -1,8 +1,9 @@
 import os
 # print(os.getcwd())
+import unittest
 import numpy as np
 from tinygrad.tensor import Tensor
-import tinygrad.optim as optim
+import tinygrad.optim as tinygrad_optim
 from tinygrad.utils import layer_init_uniform,fetch_mnist
 
 from tqdm import trange
@@ -22,60 +23,67 @@ class TinyNet:
 
 class TinyConvNet:
     def __init__(self):
-        self.chans = 4
-        self.c1 = Tensor(layer_init_uniform(self.chans, 1, 3, 3))
-        self.l1 = Tensor(layer_init_uniform(26*26*self.chans, 128))
+        chans = 4
+        conv = 7
+        self.c1 = Tensor(layer_init_uniform(chans, 1, conv, conv))
+        self.l1 = Tensor(layer_init_uniform(((28-conv+1)**2)*chans, 128))
         self.l2 = Tensor(layer_init_uniform(128, 10))
 
     def forward(self, x):
         x.data = x.data.reshape((-1, 1, 28, 28))
-        x = x.conv2d(self.c1).reshape(Tensor(np.array((-1, 26*26*self.chans)))).relu()
+        x = x.conv2d(self.c1).reshape(Tensor(np.array((x.shape[0], -1)))).relu()
         return x.dot(self.l1).relu().dot(self.l2).logsoftmax()
 
-if os.getenv("CONV") == '1':
-    model = TinyConvNet()
-    optim = optim.Adam([model.c1, model.l1, model.l2], lr=0.001)
-    steps = 400
-else:
-    model = TinyNet()
-    optim = optim.SGD([model.l1, model.l2], lr=0.001)
-    steps = 1000
-    
 
-batch_size = 128
-losses, accuracies = [], []
+class TestMNIST(unittest.TestCase):
+    def test_mnist(self):
+        if os.getenv("CONV") == '1':
+            model = TinyConvNet()
+            optim = tinygrad_optim.Adam([model.c1, model.l1, model.l2], lr=0.001)
+            steps = 400
+        else:
+            model = TinyNet()
+            optim = tinygrad_optim.SGD([model.l1, model.l2], lr=0.001)
+            steps = 1000
+            
 
-loop = trange(steps)
-for i in loop:
-    samp = np.random.randint(0, X_train.shape[0], size=(batch_size))
-    x = Tensor(X_train[samp].reshape((-1, 28*28)).astype(np.float32))
-    Y = Y_train[samp]
-    y = np.zeros((len(samp), 10), np.float32)
-    y[range(y.shape[0]), Y] = -10.0
-    y = Tensor(y)
+        batch_size = 128
+        losses, accuracies = [], []
+        loop = trange(steps)
+        for i in loop:
+            samp = np.random.randint(0, X_train.shape[0], size=(batch_size))
 
-    out = model.forward(x)
+            x = Tensor(X_train[samp].reshape((-1, 28*28)).astype(np.float32))
+            Y = Y_train[samp]
+            y = np.zeros((len(samp), 10), np.float32)
+            y[range(y.shape[0]), Y] = -10.0
+            y = Tensor(y)
 
-    loss = out.mul(y).mean()
-    loss.backward()
-    optim.step() # SGD
+            out = model.forward(x)
 
-    cat = np.argmax(out.data, axis=1)
-    accuracy = (cat == Y).mean()
+            loss = out.mul(y).mean()
+            loss.backward()
+            optim.step() # SGD
 
-    loss = loss.data
-    losses.append(loss)
-    accuracies.append(accuracy)
-    loop.set_description("loss %.2f accurcy %.2f" % (loss, accuracy))
+            cat = np.argmax(out.data, axis=1)
+            accuracy = (cat == Y).mean()
 
-
-# evaluate
-def numpy_eval():
-    Y_test_preds_out = model.forward(Tensor(X_test.reshape((-1, 28*28)).astype(np.float32)))
-    Y_test_preds = np.argmax(Y_test_preds_out.data, axis=1)
-    return (Y_test == Y_test_preds).mean()
+            loss = loss.data
+            losses.append(loss)
+            accuracies.append(accuracy)
+            loop.set_description("loss %.2f accurcy %.2f" % (loss, accuracy))
 
 
-accuracy = numpy_eval()
-print("test accuracy is %f" % accuracy)
-assert accuracy > 0.95
+        # evaluate
+        def numpy_eval():
+            Y_test_preds_out = model.forward(Tensor(X_test.reshape((-1, 28*28)).astype(np.float32)))
+            Y_test_preds = np.argmax(Y_test_preds_out.data, axis=1)
+            return (Y_test == Y_test_preds).mean()
+
+
+        accuracy = numpy_eval()
+        print("test accuracy is %f" % accuracy)
+        assert accuracy > 0.95
+
+if __name__ == '__main__':
+    unittest.main()
