@@ -13,7 +13,8 @@ class Tensor:
             print("error constructing tensor with %r" % data)
             assert(False)
         if data.dtype == np.float64:
-            print("Are you sure you want float64 in %r" % data)
+            # print("Are you sure you want float64 in %r" % data)
+            pass
         self.data = data
         self.grad = None
 
