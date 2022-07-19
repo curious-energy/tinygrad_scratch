@@ -1,8 +1,10 @@
 from functools import partialmethod
-from re import T
 import numpy as np
-from urllib3 import Retry
 
+try:
+    from numba import jit
+except ImportError:
+    jit = lambda x: x
 
 class Tensor:
     def __init__(self, data):
@@ -90,13 +92,13 @@ register('mul', Mul)
 
 
 class Add(Function):
-  @staticmethod
-  def forward(ctx, x, y):
-    return x+y
+    @staticmethod
+    def forward(ctx, x, y):
+        return x+y
 
-  @staticmethod
-  def backward(ctx, grad_output):
-    return grad_output, grad_output
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output, grad_output
 register('add', Add)
 
 
@@ -112,8 +114,6 @@ class ReLU(Function):
         grad_input = grad_output.copy()
         grad_input[input < 0] = 0
         return grad_input
-
-
 register('relu', ReLU)
 
 
@@ -129,8 +129,6 @@ class Dot(Function):
         grad_input = grad_output.dot(weight.T)
         grad_weight = grad_output.T.dot(input).T
         return grad_input, grad_weight
-
-
 register('dot', Dot)
 
 
@@ -163,15 +161,15 @@ class LogSoftmax(Function):
         return grad_output - np.exp(output)*grad_output.sum(axis=1).reshape((-1, 1))
 register('logsoftmax', LogSoftmax)
 
+# add jit speed up
 
 class Conv2D(Function):
     @staticmethod
-    def forward(ctx, x, w):
-        ctx.save_for_backward(x, w)
+    @jit
+    def inner_forward(x, w):
         cout, cin, H, W = w.shape
         # print(w.shape) - (4, 2, 3, 3)
         ret = np.zeros((x.shape[0], cout, x.shape[2]-(H-1), x.shape[3]-(W-1)), dtype=w.dtype)
-        
         for j in range(H):
             for i in range(W):
                 tw = w[:, :, j, i]
@@ -181,9 +179,8 @@ class Conv2D(Function):
         return ret
 
     @staticmethod
-    def backward(ctx, grad_output):
-        # raise Exception("please write backward pass for Conv2D")
-        x, w = ctx.saved_tensors
+    @jit
+    def inner_backward(grad_output, x, w):
         dx = np.zeros_like(x)
         dw = np.zeros_like(w)
         cout, cin, H, W = w.shape
@@ -197,6 +194,16 @@ class Conv2D(Function):
                         dx[:, :, Y+j, X+i] += gg.dot(tw)
                         dw[:, :, j, i] += gg.T.dot(tx)
         return dx, dw
+
+    @staticmethod
+    def forward(ctx, x, w):
+        ctx.save_for_backward(x, w)
+        return Conv2D.inner_forward(x, w)
+        
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return Conv2D.inner_backward(grad_output, *ctx.saved_tensors)
 register('conv2d', Conv2D)
 
 
