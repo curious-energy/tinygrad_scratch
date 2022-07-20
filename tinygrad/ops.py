@@ -1,6 +1,6 @@
 from functools import partialmethod
 import numpy as np
-
+from tinygrad.utils import im2col, col2im
 # try:
 #     from numba import jit
 # except ImportError:
@@ -27,6 +27,14 @@ class Tensor:
     @property
     def shape(self):
         return self.data.shape
+
+    @staticmethod
+    def zeros(*shape):
+        return Tensor(np.zeros(shape, dtype=np.float32))
+    
+    @staticmethod
+    def randn(*shape):
+        return Tensor(np.random.randn(*shape).astype(np.float32))
 
     def backward(self, allow_fill=True):
         if self._ctx is None:
@@ -167,6 +175,19 @@ class LogSoftmax(Function):
 register('logsoftmax', LogSoftmax)
 
 
+class Reshape(Function):
+    @staticmethod
+    def forward(ctx, x, shape):
+        ctx.save_for_backward(x.shape)
+        return x.reshape(shape)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        in_shape, = ctx.saved_tensors
+        return grad_output.reshape(in_shape), None
+register("reshape", Reshape)
+
+
 class Conv2D(Function):
     @staticmethod
     def forward(ctx, x, w):
@@ -193,17 +214,58 @@ class Conv2D(Function):
                 dx[:, :, Y:Y+H, X:X+W] += gg.dot(tw).reshape(dx.shape[0], dx.shape[1], H, W)
                 dw += gg.T.dot(tx).reshape(dw.shape)
         return dx, dw
-register('conv2d', Conv2D)
+# register('conv2d', Conv2D)
 
 
-class Reshape(Function):
+# fast about 0.2s in single pass
+class FastConv2D(Function):
     @staticmethod
-    def forward(ctx, x, shape):
-        ctx.save_for_backward(x.shape)
-        return x.reshape(shape)
+    def forward(ctx, x, w):
+        cout, cin, H, W = w.shape
+        tw = w.reshape(cout, -1).T
+        bs, oy, ox = x.shape[0], x.shape[2]-(H-1), x.shape[3]-(W-1)
+
+        tx = im2col(x, H, W)
+
+        ctx.save_for_backward(tx, w)
+        ret = tx.dot(tw).reshape(bs, oy, ox, cout)
+        return np.moveaxis(ret, [0, 1, 2, 3], [0, 2, 3, 1])
 
     @staticmethod
     def backward(ctx, grad_output):
-        in_shape, = ctx.saved_tensors
-        return grad_output.reshape(in_shape), None
-register("reshape", Reshape)
+        bs, _, oy, ox = grad_output.shape
+        tx, w = ctx.saved_tensors
+        cout, cin, H, W = w.shape
+        tw = w.reshape(w.shape[0], -1)
+
+        ggt = np.moveaxis(grad_output, [0, 1, 2, 3], [1, 0, 2, 3]).reshape(cout, -1)
+        dw = ggt.dot(tx).reshape(w.shape)
+
+        dxi = ggt.T.dot(tw)
+        dx = col2im(dxi, H, W, oy+(H-1), ox+(W-1))
+        return dx, dw
+register('conv2d', FastConv2D)
+
+
+class MaxPool2x2(Function):
+    @staticmethod
+    def forward(ctx, x):
+        stack = []
+        for Y in range(2):
+            for X in range(2):
+                stack.append(x[:,:,Y::2,X::2][None])
+        stack = np.concatenate(stack, axis=0)
+        idxs = np.argmax(stack, axis=0)
+        ctx.save_for_backward(idxs)
+        return np.max(stack, axis=0)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        idxs, = ctx.saved_tensors
+        s = grad_output.shape
+        ret = np.zeros((s[0], s[1], s[2]*2, s[3]*2), dtype=grad_output.dtype)
+        for Y in range(2):
+            for X in range(2):
+                ret[:,:,Y::2,X::2] = grad_output * (idxs == (Y*2+X))
+        return ret
+register('maxpool2x2', MaxPool2x2)

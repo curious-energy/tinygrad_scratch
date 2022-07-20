@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import unittest
-from tinygrad.tensor import Tensor, Conv2D
+from tinygrad.ops import Tensor, Conv2D
 from tinygrad.gradcheck import numerical_jacobian, gradcheck, jacobian
 
 x_init = np.random.randn(1, 3).astype(np.float32)
@@ -66,9 +66,10 @@ class TestTinygrad(unittest.TestCase):
         # coarse approx. since a "big" eps and the non-linearities of the model
         self.assertFalse(gradcheck(tiny_func, tiny_x, eps = 0.1))
 
+class TestOps(unittest.TestCase):
     def test_conv2d(self):
         x = torch.randn((5, 2, 10, 7), requires_grad=True)
-        w = torch.randn((4, 2, 3, 3), requires_grad=True)
+        w = torch.randn((4, 2, 3, 2), requires_grad=True)
         xt = Tensor(x.detach().numpy())
         wt = Tensor(w.detach().numpy())
 
@@ -79,8 +80,24 @@ class TestTinygrad(unittest.TestCase):
         out.mean().backward()
         ret.mean().backward()
 
-        np.testing.assert_allclose(w.grad, wt.grad, atol=1e-5)
-        np.testing.assert_allclose(x.grad, xt.grad, atol=1e-5)
+        np.testing.assert_allclose(w.grad, wt.grad, atol=1e-7)
+        np.testing.assert_allclose(x.grad, xt.grad, atol=1e-7)
+
+    def test_maxpool2x2(self):
+        x = torch.randn((5, 2, 10, 8), requires_grad=True)
+        xt = Tensor(x.detach().numpy())
+
+        # tinygrad version
+        ret = xt.maxpool2x2()
+        assert ret.shape == (5, 2, 10//2, 8//2)
+        ret.mean().backward()
+
+        # torch version
+        out = torch.nn.MaxPool2d((2, 2))(x)
+        out.mean().backward()
+
+        np.testing.assert_allclose(ret.data, out.detach().numpy(), atol=1e-5)
+        np.testing.assert_allclose(xt.grad, x.grad, atol=1e-5)
 
 
 if __name__ == '__main__':

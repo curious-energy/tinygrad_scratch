@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import unittest
 
-from tinygrad.tensor import Tensor, Conv2D
+from tinygrad.ops import Tensor, Conv2D
 
 x_init = np.random.randn(1,3).astype(np.float32)
 W_init = np.random.randn(3,3).astype(np.float32)

@@ -7,12 +7,11 @@ This repository is to record my learning progress, thanks the George Hotz's cont
 ### Some test
 ```
 ipython test/test.py
-```
-### No Conv
-```
+
+ipython test/test_tensor.py
+
 ipython test/test_mnist.py
 ```
-### Using Conv, now slow...
-```
-CONV=1 ipython test/test_mnist.py
-```
+Hope all tests is passed!
+
+### Oh, using python 3.8 is better!!!

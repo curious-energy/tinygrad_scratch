@@ -1,7 +1,7 @@
 import os
 import unittest
 import numpy as np
-from tinygrad.tensor import Tensor
+from tinygrad.ops import Tensor
 import tinygrad.optim as optim
 from tinygrad.utils import layer_init_uniform, fetch_mnist
 
