@@ -1,7 +1,7 @@
 import os
 import unittest
 import numpy as np
-from tinygrad.ops import Tensor
+from tinygrad.tensor import Tensor
 import tinygrad.optim as optim
 from tinygrad.utils import layer_init_uniform, fetch_mnist
 
@@ -22,7 +22,7 @@ class TinyNet:
 class TinyConvNet:
     def __init__(self):
         chans = 16
-        conv = 7
+        conv = 5
         self.c1 = Tensor(layer_init_uniform(chans, 1, conv, conv))
         self.l1 = Tensor(layer_init_uniform(((28-conv+1)**2)*chans, 128))
         self.l2 = Tensor(layer_init_uniform(128, 10))
@@ -36,8 +36,8 @@ class TinyConvNet:
 # train a model
 def train(model, optim, steps, batch_size = 128):
     losses, accuracies = [], []
-    loop = trange(steps)
-    for i in loop:
+    # loop = trange(steps)
+    for i in (t := trange(steps)):
         samp = np.random.randint(0, X_train.shape[0], size=(batch_size))
 
         x = Tensor(X_train[samp].reshape((-1, 28*28)).astype(np.float32))
@@ -58,7 +58,7 @@ def train(model, optim, steps, batch_size = 128):
         loss = loss.data
         losses.append(loss)
         accuracies.append(accuracy)
-        loop.set_description("loss %.2f accurcy %.2f" % (loss, accuracy))
+        t.set_description("loss %.2f accurcy %.2f" % (loss, accuracy))
 
 
 def evaluate(model):

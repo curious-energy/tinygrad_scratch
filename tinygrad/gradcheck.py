@@ -1,5 +1,5 @@
 import numpy as np
-from tinygrad.ops import Tensor
+from tinygrad.tensor import Tensor
 from tinygrad.utils import mask_like
 
 def jacobian(func, input):

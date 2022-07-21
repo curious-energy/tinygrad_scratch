@@ -1,7 +1,8 @@
 import numpy as np
 import torch
 import unittest
-from tinygrad.ops import Tensor, Conv2D
+from tinygrad.tensor import Tensor
+from tinygrad.ops import Conv2D
 from tinygrad.gradcheck import numerical_jacobian, gradcheck, jacobian
 
 x_init = np.random.randn(1, 3).astype(np.float32)

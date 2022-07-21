@@ -11,7 +11,7 @@ import time
 import cProfile
 import pstats
 import unittest
-from tinygrad.ops import Tensor
+from tinygrad.tensor import Tensor
 
 
 def profile_conv(bs, chans, conv, cnt=10):
@@ -31,6 +31,7 @@ def profile_conv(bs, chans, conv, cnt=10):
 
 class TestConvSpeed(unittest.TestCase):
     def test_forward_backward_3x3(self):
+        profile_conv(128, 16, 3, cnt=1)
         pr = cProfile.Profile(timer=lambda: int(time.time()*1e9), timeunit=1e-6)
         pr.enable()
         fpt, bpt = profile_conv(128, 16, 3)
