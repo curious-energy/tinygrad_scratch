@@ -12,6 +12,8 @@ import cProfile
 import pstats
 import unittest
 from tinygrad.tensor import Tensor
+import numpy as np
+import torch
 
 
 def profile_conv(bs, chans, conv, cnt=10):

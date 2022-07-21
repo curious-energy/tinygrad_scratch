@@ -21,17 +21,19 @@ class TinyNet:
 
 class TinyConvNet:
     def __init__(self):
-        chans = 16
-        conv = 5
-        self.c1 = Tensor(layer_init_uniform(chans, 1, conv, conv))
-        self.l1 = Tensor(layer_init_uniform(((28-conv+1)**2)*chans, 128))
-        self.l2 = Tensor(layer_init_uniform(128, 10))
+        # chans = 16
+        inter_chan, out_chan = 8, 16
+        conv = 3
+        self.c1 = Tensor(layer_init_uniform(inter_chan, 1, conv, conv))
+        self.c2 = Tensor(layer_init_uniform(out_chan, inter_chan, conv, conv))
+        self.l1 = Tensor(layer_init_uniform(out_chan*5*5, 10))
 
     def forward(self, x):
         x.data = x.data.reshape((-1, 1, 28, 28))
-        x = x.conv2d(self.c1).relu()
+        x = x.conv2d(self.c1).relu().maxpool2x2()
+        x = x.conv2d(self.c2).relu().maxpool2x2()
         x = x.reshape(Tensor(np.array((x.shape[0], -1))))
-        return x.dot(self.l1).relu().dot(self.l2).logsoftmax()
+        return x.dot(self.l1).logsoftmax()
 
 # train a model
 def train(model, optim, steps, batch_size = 128):
@@ -76,7 +78,7 @@ class TestMNIST(unittest.TestCase):
     def test_conv(self):
         np.random.seed(1337)
         model = TinyConvNet()
-        optimizer = optim.Adam([model.c1, model.l1, model.l2], lr=0.001)
+        optimizer = optim.Adam([model.c1, model.c2, model.l1], lr=0.001)
         train(model, optimizer, steps=400)
         evaluate(model)
 
