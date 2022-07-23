@@ -126,7 +126,7 @@ class Conv2D(Function):
                 dx[:, :, Y:Y+H, X:X+W] += gg.dot(tw).reshape(dx.shape[0], dx.shape[1], H, W)
                 dw += gg.T.dot(tx).reshape(dw.shape)
         return dx, dw
-# register('conv2d', Conv2D)
+register('conv2d', Conv2D)
 
 
 # fast about 0.2s in single pass
@@ -156,19 +156,22 @@ class FastConv2D(Function):
         dxi = ggt.T.dot(tw)
         dx = col2im(dxi, H, W, oy+(H-1), ox+(W-1))
         return dx, dw
-register('conv2d', FastConv2D)
+# register('conv2d', FastConv2D)
+
+def stack_for_pool(x, py, px):
+    my, mx = (x.shape[2]//py)*py, (x.shape[3]//px)*px
+    stack = []
+    xup = x[:, :, :my, :mx]
+    for Y in range(py):
+        for X in range(px):
+            stack.append(xup[:, :, Y::2, X::2][None])
+    return np.concatenate(stack, axis=0)
 
 
-class MaxPool2x2(Function):
+class MaxPool2D(Function):
     @staticmethod
     def forward(ctx, x):
-        my, mx = (x.shape[2]//2)*2, (x.shape[3]//2)*2
-        stack = []
-        xup = x[:, :, :my, :mx]
-        for Y in range(2):
-            for X in range(2):
-                stack.append(xup[:,:,Y::2,X::2][None])
-        stack = np.concatenate(stack, axis=0)
+        stack = stack_for_pool(x, 2, 2)
         idxs = np.argmax(stack, axis=0)
         ctx.save_for_backward(idxs, x.shape)
         return np.max(stack, axis=0)
@@ -182,4 +185,23 @@ class MaxPool2x2(Function):
             for X in range(2):
                 ret[:,:,Y:my:2,X:mx:2] = grad_output * (idxs == (Y*2+X))
         return ret
-register('maxpool2x2', MaxPool2x2)
+register('max_pool2d', MaxPool2D)
+
+
+class AvgPool2D(Function):
+    @staticmethod
+    def forward(ctx, x):
+        stack = stack_for_pool(x, 2, 2)
+        ctx.save_for_backward(x.shape)
+        return np.mean(stack, axis=0)
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        s, = ctx.saved_tensors
+        my, mx = (s[2]//2)*2, (s[3]//2)*2
+        ret = np.zeros(s, dtype=grad_output.dtype)
+        for Y in range(2):
+            for X in range(2):
+                ret[:,:,Y:my:2,X:mx:2] = grad_output / 4
+        return ret
+register('avg_pool2d', AvgPool2D)

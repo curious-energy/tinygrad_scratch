@@ -30,8 +30,8 @@ class TinyConvNet:
 
     def forward(self, x):
         x.data = x.data.reshape((-1, 1, 28, 28))
-        x = x.conv2d(self.c1).relu().maxpool2x2()
-        x = x.conv2d(self.c2).relu().maxpool2x2()
+        x = x.conv2d(self.c1).relu().max_pool2d()
+        x = x.conv2d(self.c2).relu().max_pool2d()
         x = x.reshape(Tensor(np.array((x.shape[0], -1))))
         return x.dot(self.l1).logsoftmax()
 
@@ -39,7 +39,7 @@ class TinyConvNet:
 def train(model, optim, steps, batch_size = 128):
     losses, accuracies = [], []
     # loop = trange(steps)
-    for i in (t := trange(steps)):
+    for i in (t := trange(steps, disable=os.getenv('CI') is not None)):
         samp = np.random.randint(0, X_train.shape[0], size=(batch_size))
 
         x = Tensor(X_train[samp].reshape((-1, 28*28)).astype(np.float32))
@@ -79,7 +79,7 @@ class TestMNIST(unittest.TestCase):
         np.random.seed(1337)
         model = TinyConvNet()
         optimizer = optim.Adam([model.c1, model.c2, model.l1], lr=0.001)
-        train(model, optimizer, steps=600)
+        train(model, optimizer, steps=200)
         evaluate(model)
 
     def test_sgd(self):
